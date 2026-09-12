@@ -1,0 +1,20 @@
+# Build products and local design/debug output
+/build/
+/designs/
+/previews/
+/screenshots/
+/tools/
+*.app/
+.DS_Store
+__pycache__/
+*.pyc
+*.log
+
+# Local credentials and editor state
+.env
+.env.*
+auth.json
+*.pem
+*.key
+.idea/
+.vscode/
