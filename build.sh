@@ -9,5 +9,6 @@ xcrun swiftc -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" \
   -framework AppKit -framework SwiftUI -framework ServiceManagement
 cp Info.plist 'build/Codex Usage Monitor.app/Contents/Info.plist'
 cp Resources/AppIcon.icns 'build/Codex Usage Monitor.app/Contents/Resources/AppIcon.icns'
+cp LICENSE NOTICE 'build/Codex Usage Monitor.app/Contents/Resources/'
 codesign --force --sign - --identifier local.codexquota.menubar 'build/Codex Usage Monitor.app'
 printf '%s\n' "$PWD/build/Codex Usage Monitor.app"

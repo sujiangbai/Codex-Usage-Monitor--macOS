@@ -95,6 +95,14 @@ iconutil -c icns build/AppIcon.iconset -o Resources/AppIcon.icns
 
 先在组件面板关闭「登录 Mac 时启动」，点击「退出」，再将 `~/Applications/Codex Usage Monitor.app` 移到废纸篓即可。偏好域为 `local.codexquota.menubar`；偏好只包含上述选择，不含额度和账号数据。
 
+## 许可证
+
+Copyright 2026 sujiangbai。
+
+本项目采用 [Apache License 2.0](LICENSE)，署名信息见 [NOTICE](NOTICE)。允许商业使用、修改和再分发，不要求衍生项目公开源码；再分发时应遵守许可证与相关声明保留、修改标注等要求。许可证包含明确的专利授权条款，不授予商标使用权。
+
+构建后的应用资源目录与后续发布的 ZIP 均附带 `LICENSE` 和 `NOTICE`。
+
 ## 参考
 
 - [官方额度接口](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)

@@ -25,6 +25,7 @@ codesign --verify --strict "$app"
 package_name="Codex-Usage-Monitor-v${version}-macOS-arm64"
 package="$release_work/$package_name"
 mkdir -p "$package"
+cp "$release_work/source/LICENSE" "$release_work/source/NOTICE" "$package/"
 ditto --norsrc --noextattr --noqtn "$app" "$package/Codex Usage Monitor.app"
 codesign --verify --strict "$package/Codex Usage Monitor.app"
 cat > "$package/INSTALL.txt" <<EOF
