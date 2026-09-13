@@ -2,13 +2,13 @@
 
 <img src="Resources/AppIcon.png" alt="Codex Usage Monitor icon" width="96">
 
-独立开发的 macOS Codex 额度菜单栏工具。
+独立开发的 macOS Codex 额度菜单栏工具，**非 OpenAI 官方产品，与 OpenAI 无隶属、赞助或认可关系**。
 
 原生 SwiftUI / AppKit 小应用：菜单栏显示细进度环与剩余百分比。点击后可选择「每周」或「5 小时」，选择会保存。首次打开时由用户选择是否登录 Mac 后自动启动，之后可以在面板中切换。
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.0-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
+从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.1-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
 
 发布包使用 ad-hoc 签名，**尚未经过 Apple Developer ID 签名及公证**，macOS 可能阻止打开下载的应用。也可以按照下方说明在自己的 Mac 上从源码构建。请勿为此关闭系统整体安全保护。
 
@@ -22,8 +22,9 @@ shasum -a 256 -c SHA256SUMS.txt
 
 1. 保持官方 Codex 已安装并通过 ChatGPT 账号登录。
 2. 打开 `~/Applications/Codex Usage Monitor.app`。
-3. 点击菜单栏的圆环和百分比；选择显示周期。
-4. 首次打开时点击「暂不开启」或「开启自动启动」。关闭面板不会替你作出选择；下次打开仍可选择。
+3. 首次打开（包括从旧版升级）先阅读隐私说明，点击「开始监控」后才会查询。关闭面板不会视为同意。
+4. 点击菜单栏的圆环和百分比；选择显示周期。
+5. 首次设置登录启动时点击「暂不开启」或「开启自动启动」。关闭面板不会替你作出选择；下次打开仍可选择。
 
 自动启动使用 macOS 的 SMAppService 登录项。若 macOS 要求确认，应用会显示「打开登录项设置」。没有创建 LaunchAgent，没有修改 Codex 或 shell 启动脚本。退出组件不会退出 Codex。
 
@@ -37,7 +38,8 @@ shasum -a 256 -c SHA256SUMS.txt
 
 ## 额度与刷新
 
-- 启动时查询，之后每 5 分钟查询；支持手动刷新，Mac 唤醒后也会刷新。
+- 同意开始监控后查询，正常情况下每 5 分钟刷新；支持手动刷新，Mac 唤醒后若已到刷新时间会查询。
+- 连续失败的自动重试间隔为 5、10、20、30 分钟，之后上限 30 分钟；成功后恢复 5 分钟。手动刷新最短间隔 10 秒，进行中的查询不会重复启动。
 - 默认优先每周；首次数据返回时 Plus 若有 5 小时额度则默认选中 5 小时。之后以用户的已保存选择为准。
 - 按接口 `windowDurationMins` 识别周期，不将 primary / secondary 固定解释成 5 小时 / 每周。
 - 优先使用 `rateLimitsByLimitId.codex`；不会把其他模型额度当成 Codex 主额度。
@@ -53,7 +55,17 @@ shasum -a 256 -c SHA256SUMS.txt
 
 调用时以进程参数禁用 analytics 和 OpenTelemetry 的日志、追踪、指标导出，不修改用户的 Codex 配置。标准错误丢弃，应用不会保存原始响应或原始错误。官方 Codex 进程仍会按自身机制读取配置和认证，并可能维护它自己的运行状态；组件不会读取这些状态文件的内容。
 
-应用仅通过 UserDefaults 保存 `displayPeriod` 和 `startupChoiceMade` 两项偏好。自启状态由 macOS 管理。首次启动不调用注册登录项；必须由用户点击开启。
+应用仅通过 UserDefaults 保存 `displayPeriod`、`startupChoiceMade` 和 `monitoringConsentV1` 三项偏好。自启状态由 macOS 管理。首次启动不调用注册登录项；必须由用户点击开启。
+
+完整说明见 [PRIVACY.md](PRIVACY.md)。面板中的「停止监控」会停止查询、清除保留的额度并撤回监控选择；下次启动仍需重新点击「开始监控」。该操作不更改独立的登录启动设置；彻底停用时请先关闭登录启动，再退出应用。
+
+## 使用边界
+
+额度仅供参考，以官方服务显示及实际限制为准。本项目不保证数据实时准确、接口持续兼容或持续维护。软件按 Apache 2.0 第 7–8 条按现状提供，责任限制以许可证及适用法律为准，不排除依法不能排除的责任。
+
+请仅查询你有权使用的账号，并遵守适用的 OpenAI 服务条款和所在组织的规定。项目许可证不授予 OpenAI 服务访问权或第三方商标使用权。Codex、OpenAI 等名称用于说明兼容对象，相关权利归其权利人；项目未取得 OpenAI 对此产品名称的专项书面认可。
+
+安全问题请按 [SECURITY.md](SECURITY.md) 私下报告；不要在公开 Issue 中上传凭据、原始响应或真实账号截图。
 
 ## 构建与验证
 

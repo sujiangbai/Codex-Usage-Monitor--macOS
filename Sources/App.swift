@@ -4,152 +4,6 @@ import Combine
 import ServiceManagement
 
 @MainActor
-final class QuotaModel: ObservableObject {
-    @Published var bucket: QuotaBucket?
-    @Published var selected: QuotaPeriod
-    @Published var loading = false
-    @Published var errorMessage: String?
-    @Published var lastUpdated: Date?
-    @Published var now = Date()
-    @Published var startupChosen: Bool
-    @Published var loginEnabled = false
-    @Published var loginNeedsApproval = false
-    @Published var loginError: String?
-    let demo: Bool
-    private var hasSelected: Bool
-    private var timer: Timer?
-    private var client: CodexClient?
-    private var nextRefresh = Date.distantPast
-
-    init(demo: Bool = false, samplePeriod: QuotaPeriod = .weekly, welcome: Bool = false) {
-        self.demo = demo
-        let saved = demo ? nil : UserDefaults.standard.string(forKey: "displayPeriod")
-        selected = saved.flatMap(QuotaPeriod.init(rawValue:)) ?? samplePeriod
-        hasSelected = saved != nil
-        startupChosen = demo ? !welcome : UserDefaults.standard.bool(forKey: "startupChoiceMade")
-        if demo {
-            let future = Date().addingTimeInterval(60 * 60 * 48)
-            bucket = QuotaBucket(limitId: "codex", planType: "pro",
-                primary: QuotaWindow(usedPercent: 18, windowDurationMins: 300, resetsAt: Date().addingTimeInterval(11520).timeIntervalSince1970),
-                secondary: QuotaWindow(usedPercent: 36, windowDurationMins: 10080, resetsAt: future.timeIntervalSince1970))
-            lastUpdated = Date()
-        } else { syncLoginStatus() }
-    }
-
-    var selectedWindow: QuotaWindow? { bucket?.window(for: selected) }
-    var isStale: Bool { lastUpdated.map { now.timeIntervalSince($0) > 360 } ?? true }
-    var displayRemaining: Int? {
-        guard errorMessage == nil, !isStale, let window = selectedWindow, !window.hasElapsed(at: now) else { return nil }
-        return window.remaining
-    }
-    var menuTitle: String { displayRemaining.map { "\($0)%" } ?? (loading && bucket == nil ? "···" : "—") }
-    var accessibleSummary: String {
-        "Codex · \(selected.title)" + (displayRemaining.map { "剩余 \($0)%" } ?? "额度暂不可用")
-    }
-    var updateText: String {
-        guard let lastUpdated else { return loading ? "正在查询额度…" : "尚未成功更新" }
-        let minutes = max(0, Int(now.timeIntervalSince(lastUpdated) / 60))
-        return (errorMessage != nil || isStale ? "上次成功：" : "") + (minutes < 1 ? "刚刚更新" : "\(minutes) 分钟前更新")
-    }
-
-    func start() {
-        guard !demo else { return }
-        refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.now = Date()
-                if self.now >= self.nextRefresh { self.refresh() }
-            }
-        }
-        timer?.tolerance = 5
-    }
-
-    func stop() { timer?.invalidate(); client?.cancel() }
-
-    func choose(_ period: QuotaPeriod) {
-        selected = period
-        hasSelected = true
-        if !demo { UserDefaults.standard.set(period.rawValue, forKey: "displayPeriod") }
-    }
-
-    static func locateCodex() -> URL? {
-        // Resolve only the official application and standard CLI locations.
-        var candidates: [URL] = []
-        if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
-            candidates.append(app.appendingPathComponent("Contents/Resources/codex"))
-        }
-        candidates += ["/Applications/ChatGPT.app/Contents/Resources/codex",
-                       "/Applications/Codex.app/Contents/Resources/codex",
-                       "/opt/homebrew/bin/codex", "/usr/local/bin/codex"].map { URL(fileURLWithPath: $0) }
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
-    }
-
-    func refresh() {
-        guard !loading else { return }
-        now = Date()
-        if demo { lastUpdated = now; return }
-        nextRefresh = now.addingTimeInterval(300)
-        guard let executable = Self.locateCodex() else {
-            bucket = nil; errorMessage = QuotaError.missingCodex.message; return
-        }
-        loading = true
-        let request = CodexClient()
-        client = request
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            let result = Result { try request.fetch(executable: executable) }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.loading = false
-                self.client = nil
-                self.now = Date()
-                switch result {
-                case .success(let response):
-                    self.bucket = response.codex
-                    self.lastUpdated = self.now
-                    self.errorMessage = nil
-                    if !self.hasSelected, let bucket = response.codex {
-                        self.choose(bucket.initialPeriod)
-                    }
-                case .failure(let error):
-                    self.bucket = nil
-                    self.errorMessage = (error as? QuotaError ?? .queryFailed).message
-                }
-            }
-        }
-    }
-
-    func syncLoginStatus() {
-        guard !demo else { return }
-        let status = SMAppService.mainApp.status
-        loginEnabled = status == .enabled
-        loginNeedsApproval = status == .requiresApproval
-    }
-
-    func chooseStartup(_ enabled: Bool) {
-        if demo { loginEnabled = enabled; startupChosen = true; return }
-        loginError = nil
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else if SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .requiresApproval {
-                try SMAppService.mainApp.unregister()
-            }
-            startupChosen = true
-            UserDefaults.standard.set(true, forKey: "startupChoiceMade")
-        } catch {
-            loginError = "未能更改启动设置，可在系统设置的「登录项」中调整。"
-        }
-        syncLoginStatus()
-    }
-
-    func openLoginSettings() {
-        guard !demo else { return }
-        SMAppService.openSystemSettingsLoginItems()
-    }
-}
-
-@MainActor
 func statusRing(remaining: Int?) -> NSImage {
     let image = NSImage(size: NSSize(width: 17, height: 17), flipped: false) { rect in
         let center = NSPoint(x: rect.midX, y: rect.midY)
@@ -264,9 +118,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateStatus()
         model.start()
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.model.refresh() }
+            Task { @MainActor in self?.model.refreshAutomatically() }
         }
-        if !model.startupChosen || demo || args.contains("--show") {
+        if !model.monitoringAllowed || !model.startupChosen || demo || args.contains("--show") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.showPopover() }
         }
         if verifyingLayout {
@@ -348,7 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let screen = statusItem.button?.window?.screen else { fatalError("No status bar screen") }
         let sample = model.bucket
         var top: CGFloat?
-        for phase in 0..<5 {
+        for phase in 0..<6 {
+            if phase == 5 { model.withdrawMonitoring() }
             model.bucket = phase == 0 ? nil : sample
             model.startupChosen = phase == 2
             model.selected = phase == 3 ? .fiveHour : .weekly
@@ -375,8 +230,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func renderPreview(to directory: URL) {
         // Render our own native view using synthetic values; never capture the user's screen.
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for (name, period, welcome) in [("weekly", QuotaPeriod.weekly, false), ("five-hour", .fiveHour, false), ("first-launch", .weekly, true)] {
+        for (name, period, welcome) in [("weekly", QuotaPeriod.weekly, false), ("five-hour", .fiveHour, false), ("first-launch", .weekly, true), ("privacy", .weekly, true)] {
             let sample = QuotaModel(demo: true, samplePeriod: period, welcome: welcome)
+            if name == "privacy" { sample.withdrawMonitoring() }
             let view = NSHostingView(rootView: QuotaPanel(model: sample))
             view.appearance = NSAppearance(named: .aqua)
             view.setFrameSize(view.fittingSize)

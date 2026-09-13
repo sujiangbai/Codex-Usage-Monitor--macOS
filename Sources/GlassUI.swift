@@ -165,68 +165,99 @@ struct QuotaPanel: View {
                 Spacer(minLength: 8)
                 Button(action: model.refresh) {
                     Image(systemName: "arrow.clockwise").font(.system(size: 14, weight: .regular)).frame(width: 28, height: 28)
-                }.buttonStyle(GlassButtonStyle()).disabled(model.loading)
-                    .help("刷新").accessibilityLabel("刷新")
+                }.buttonStyle(GlassButtonStyle()).disabled(!model.canRefresh)
+                    .help("刷新（请求间隔至少 10 秒）").accessibilityLabel("刷新")
                     .accessibilityValue(model.loading ? "正在查询额度" : "")
                     .glassFocus("refresh", selection: $focused).focusOutline(focused == "refresh")
             }
-            Text("菜单栏显示").font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 5)
-            HStack(spacing: 0) {
-                ForEach(QuotaPeriod.allCases, id: \.self) { period in
-                    Button { model.choose(period) } label: {
-                        Text(period.title).font(.system(size: 12, weight: model.selected == period ? .medium : .regular))
-                            .frame(maxWidth: .infinity).frame(height: 24)
-                    }.buttonStyle(GlassButtonStyle(selected: model.selected == period, textOnly: model.selected != period))
-                        .accessibilityLabel("菜单栏显示：\(period.title)")
-                        .accessibilityAddTraits(model.selected == period ? .isSelected : [])
-                        .glassFocus(period.rawValue, selection: $focused).focusOutline(focused == period.rawValue)
-                }
-            }.padding(2).frame(height: 28)
-                .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.white.opacity(0.30), lineWidth: 0.6))
-                .padding(.top, 5)
-
-            VStack(spacing: 14) {
-                quotaRow(model.selected, prominent: true)
-                let other: QuotaPeriod = model.selected == .weekly ? .fiveHour : .weekly
-                if model.bucket?.window(for: other) != nil { quotaRow(other, prominent: false) }
-            }.padding(.top, 14)
-
-            if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.circle")
-                    .font(.system(size: 12)).foregroundStyle(GlassPalette.secondary)
-                    .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
-            } else if model.isStale && !model.loading && model.bucket != nil {
-                Text("数据已过期，请刷新后查看。").font(.system(size: 12))
-                    .foregroundStyle(GlassPalette.secondary).padding(.top, 12)
-            }
-
-            separator.padding(.top, 14)
-            if !model.startupChosen {
-                Text("登录 Mac 时自动启动？").font(.system(size: 12, weight: .medium)).padding(.top, 12)
-                Text("以后也可以随时更改。").font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 4)
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    Button { model.chooseStartup(false) } label: {
-                        Text("暂不开启").frame(width: 112, height: 28)
-                    }.buttonStyle(GlassButtonStyle()).glassFocus("skip", selection: $focused).focusOutline(focused == "skip")
-                    Button { model.chooseStartup(true) } label: {
-                        Text("开启自动启动").frame(width: 140, height: 28)
-                    }.buttonStyle(GlassButtonStyle(primary: true)).glassFocus("enable", selection: $focused).focusOutline(focused == "enable")
-                }.font(.system(size: 12, weight: .medium)).padding(.top, 10)
-                loginStatus
-                separator.padding(.top, 16)
+            if !model.monitoringAllowed {
+                Text("开始监控前").font(.system(size: 12, weight: .medium)).padding(.top, 14)
+                Text("通过本机 Codex 查询当前登录账号的额度，每 5 分钟刷新。仅在本机显示，不向本项目开发者上传，也不保存额度历史。")
+                    .font(.system(size: 12)).fixedSize(horizontal: false, vertical: true).padding(.top, 6)
+                Text("Codex 负责认证与联网，可能维护自身配置、认证状态和日志。请仅查看你有权使用的账号。可随时停止监控。")
+                    .font(.system(size: 11)).foregroundStyle(GlassPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 7)
+                Text("独立项目，非 OpenAI 官方产品。")
+                    .font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 7)
+                HStack {
+                    Button(action: model.openPrivacy) { Text("隐私说明").frame(minHeight: 28) }
+                        .buttonStyle(GlassButtonStyle(textOnly: true))
+                        .glassFocus("privacy", selection: $focused).focusOutline(focused == "privacy")
+                    Spacer()
+                    Button(action: model.allowMonitoring) { Text("开始监控").frame(width: 112, height: 28) }
+                        .buttonStyle(GlassButtonStyle(primary: true))
+                        .glassFocus("consent", selection: $focused).focusOutline(focused == "consent")
+                }.font(.system(size: 12)).padding(.top, 12)
+                separator.padding(.top, 12)
                 HStack { Spacer(); quitButton }.padding(.top, 6)
             } else {
-                HStack(spacing: 8) {
-                    Text("登录 Mac 时启动").font(.system(size: 12))
-                    Toggle("登录 Mac 时启动", isOn: Binding(get: { model.loginEnabled || model.loginNeedsApproval }, set: { model.chooseStartup($0) }))
-                        .labelsHidden().toggleStyle(.switch).controlSize(.small)
-                        .glassFocus("login", selection: $focused).focusOutline(focused == "login")
-                    Spacer(minLength: 16)
-                    quitButton
-                }.padding(.top, 8)
-                loginStatus
+                Text("菜单栏显示").font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 5)
+                HStack(spacing: 0) {
+                    ForEach(QuotaPeriod.allCases, id: \.self) { period in
+                        Button { model.choose(period) } label: {
+                            Text(period.title).font(.system(size: 12, weight: model.selected == period ? .medium : .regular))
+                                .frame(maxWidth: .infinity).frame(height: 24)
+                        }.buttonStyle(GlassButtonStyle(selected: model.selected == period, textOnly: model.selected != period))
+                            .accessibilityLabel("菜单栏显示：\(period.title)")
+                            .accessibilityAddTraits(model.selected == period ? .isSelected : [])
+                            .glassFocus(period.rawValue, selection: $focused).focusOutline(focused == period.rawValue)
+                    }
+                }.padding(2).frame(height: 28)
+                    .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 9))
+                    .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.white.opacity(0.30), lineWidth: 0.6))
+                    .padding(.top, 5)
+
+                VStack(spacing: 14) {
+                    quotaRow(model.selected, prominent: true)
+                    let other: QuotaPeriod = model.selected == .weekly ? .fiveHour : .weekly
+                    if model.bucket?.window(for: other) != nil { quotaRow(other, prominent: false) }
+                }.padding(.top, 14)
+
+                if let error = model.errorMessage {
+                    Label(error, systemImage: "exclamationmark.circle")
+                        .font(.system(size: 12)).foregroundStyle(GlassPalette.secondary)
+                        .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
+                } else if model.isStale && !model.loading && model.bucket != nil {
+                    Text("数据已过期，请刷新后查看。").font(.system(size: 12))
+                        .foregroundStyle(GlassPalette.secondary).padding(.top, 12)
+                }
+
+                separator.padding(.top, 14)
+                if !model.startupChosen {
+                    Text("登录 Mac 时自动启动？").font(.system(size: 12, weight: .medium)).padding(.top, 12)
+                    Text("以后也可以随时更改。").font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 4)
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        Button { model.chooseStartup(false) } label: {
+                            Text("暂不开启").frame(width: 112, height: 28)
+                        }.buttonStyle(GlassButtonStyle()).glassFocus("skip", selection: $focused).focusOutline(focused == "skip")
+                        Button { model.chooseStartup(true) } label: {
+                            Text("开启自动启动").frame(width: 140, height: 28)
+                        }.buttonStyle(GlassButtonStyle(primary: true)).glassFocus("enable", selection: $focused).focusOutline(focused == "enable")
+                    }.font(.system(size: 12, weight: .medium)).padding(.top, 10)
+                    loginStatus
+                    separator.padding(.top, 16)
+                    HStack { Spacer(); quitButton }.padding(.top, 6)
+                } else {
+                    HStack(spacing: 8) {
+                        Text("登录 Mac 时启动").font(.system(size: 12))
+                        Toggle("登录 Mac 时启动", isOn: Binding(get: { model.loginEnabled || model.loginNeedsApproval }, set: { model.chooseStartup($0) }))
+                            .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                            .glassFocus("login", selection: $focused).focusOutline(focused == "login")
+                        Spacer(minLength: 16)
+                        quitButton
+                    }.padding(.top, 8)
+                    loginStatus
+                }
+                HStack {
+                    Button(action: model.openPrivacy) { Text("隐私说明").frame(minHeight: 28) }
+                        .buttonStyle(GlassButtonStyle(textOnly: true))
+                        .glassFocus("privacy", selection: $focused).focusOutline(focused == "privacy")
+                    Spacer()
+                    Button(action: model.withdrawMonitoring) { Text("停止监控").frame(minHeight: 28) }
+                        .buttonStyle(GlassButtonStyle(textOnly: true))
+                        .glassFocus("stop", selection: $focused).focusOutline(focused == "stop")
+                }.font(.system(size: 11)).foregroundStyle(GlassPalette.secondary).padding(.top, 6)
             }
         }.padding(14).frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
@@ -234,12 +265,16 @@ struct QuotaPanel: View {
             .background(GlassSurface())
             .background(GlassKeyboardActivation(activate: { activateFocused(currentFocus) }))
             .environment(\.colorScheme, .light)
+            .onChange(of: model.monitoringAllowed) { _ in focused = nil }
     }
 
     private func activateFocused(_ focused: String?) -> Bool {
         guard let focused else { return false }
         if let period = QuotaPeriod(rawValue: focused) { model.choose(period); return true }
         switch focused {
+        case "consent": model.allowMonitoring()
+        case "stop": model.withdrawMonitoring()
+        case "privacy": model.openPrivacy()
         case "refresh": if !model.loading { model.refresh() }
         case "skip": model.chooseStartup(false)
         case "enable": model.chooseStartup(true)

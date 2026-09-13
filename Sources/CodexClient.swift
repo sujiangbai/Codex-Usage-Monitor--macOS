@@ -57,7 +57,7 @@ final class CodexClient: @unchecked Sendable {
             catch { throw QuotaError.disconnected }
         }
         try send(["id": 1, "method": "initialize", "params": [
-            "clientInfo": ["name": "codex_quota", "title": "Codex Usage Monitor", "version": "0.1.0"],
+            "clientInfo": ["name": "codex_quota", "title": "Codex Usage Monitor", "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"],
             "capabilities": ["experimentalApi": false]]])
 
         let fd = output.fileHandleForReading.fileDescriptor

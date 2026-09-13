@@ -26,6 +26,7 @@ package_name="Codex-Usage-Monitor-v${version}-macOS-arm64"
 package="$release_work/$package_name"
 mkdir -p "$package"
 cp "$release_work/source/LICENSE" "$release_work/source/NOTICE" "$package/"
+cp "$release_work/source/PRIVACY.md" "$release_work/source/SECURITY.md" "$package/"
 ditto --norsrc --noextattr --noqtn "$app" "$package/Codex Usage Monitor.app"
 codesign --verify --strict "$package/Codex Usage Monitor.app"
 cat > "$package/INSTALL.txt" <<EOF
@@ -40,6 +41,9 @@ Quit any previous version of Codex Usage Monitor before updating.
 Move Codex Usage Monitor.app to ~/Applications (recommended) or /Applications,
 then open it. The quota indicator appears in the macOS menu bar.
 Existing preferences are retained. Automatic login startup is optional.
+Before the first query, review the privacy notice and choose Start monitoring.
+Stop monitoring clears in-memory quota data and stops queries until you opt in
+again. It does not change your separate login startup preference.
 
 This app uses ad-hoc signing and is NOT Apple-notarized. macOS may block the
 downloaded application because its developer cannot be verified. Building from
@@ -49,6 +53,9 @@ No global security setting changes are required by the app.
 The app does not bundle credentials, usage records or the official Codex binary.
 It asks the installed official Codex process for quota data using existing login.
 This is an independent project, not an official OpenAI product.
+Licensed under Apache-2.0; see LICENSE and NOTICE. Quota data is informational;
+the official service is authoritative. No guarantee of real-time accuracy,
+continued compatibility or maintenance. See PRIVACY.md and SECURITY.md.
 EOF
 ditto -c -k --keepParent --norsrc --noextattr --noqtn "$package" "$release_work/output/$package_name.zip"
 (
