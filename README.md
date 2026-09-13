@@ -2,7 +2,7 @@
 
 <img src="Resources/AppIcon.png" alt="Codex Usage Monitor icon" width="96">
 
-独立开发的 macOS Codex 额度菜单栏工具，非 OpenAI 官方产品。
+独立开发的 macOS Codex 额度菜单栏工具。
 
 原生 SwiftUI / AppKit 小应用：菜单栏显示细进度环与剩余百分比。点击后可选择「每周」或「5 小时」，选择会保存。首次打开时由用户选择是否登录 Mac 后自动启动，之后可以在面板中切换。
 
