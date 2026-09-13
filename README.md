@@ -6,6 +6,18 @@
 
 原生 SwiftUI / AppKit 小应用：菜单栏显示细进度环与剩余百分比。点击后可选择「每周」或「5 小时」，选择会保存。首次打开时由用户选择是否登录 Mac 后自动启动，之后可以在面板中切换。
 
+## 下载与安装
+
+从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.0-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
+
+发布包使用 ad-hoc 签名，**尚未经过 Apple Developer ID 签名及公证**，macOS 可能阻止打开下载的应用。也可以按照下方说明在自己的 Mac 上从源码构建。请勿为此关闭系统整体安全保护。
+
+Release 同时提供 `SHA256SUMS.txt`，下载到与 ZIP 相同的目录后可校验文件完整性：
+
+```sh
+shasum -a 256 -c SHA256SUMS.txt
+```
+
 ## 使用
 
 1. 保持官方 Codex 已安装并通过 ChatGPT 账号登录。
@@ -65,6 +77,8 @@ open "$HOME/Applications/Codex Usage Monitor.app"
 `--demo --demo-weekly-only` 仅用于独立验证单周期首次启动状态；加 `--demo-regular` 可直接显示常规状态。`--demo-backdrop` 和可选的 `--dark-backdrop` 只在演示模式创建临时背景窗口，不修改壁纸。仓库不包含真实账号额度截图或运行记录。
 
 构建使用本机 ad-hoc 签名，未进行 Developer ID 公证。建议在自己的 Mac 上从源码构建；当前没有提供经过公证的安装包。
+
+维护者可在干净的 Git 工作区运行 `zsh scripts/release.sh`：脚本从当前提交导出源码、执行测试、重新构建，生成不含本地扩展属性的 ZIP 与校验文件，输出到 `build/releases/v<版本号>/`。它不会自动创建标签或上传到 GitHub。
 
 
 ## 图标资源

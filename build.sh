@@ -3,6 +3,7 @@ set -euo pipefail
 cd "${0:A:h}"
 mkdir -p build/module-cache 'build/Codex Usage Monitor.app/Contents/MacOS' 'build/Codex Usage Monitor.app/Contents/Resources'
 xcrun swiftc -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" \
+  -file-prefix-map "$PWD=." -debug-prefix-map "$PWD=." \
   -target arm64-apple-macosx13.0 Sources/Quota.swift Sources/CodexClient.swift Sources/PanelPlacement.swift Sources/GlassUI.swift Sources/App.swift \
   -o 'build/Codex Usage Monitor.app/Contents/MacOS/CodexQuota' \
   -framework AppKit -framework SwiftUI -framework ServiceManagement
