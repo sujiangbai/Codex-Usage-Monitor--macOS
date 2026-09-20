@@ -68,6 +68,21 @@ final class QuotaModel: ObservableObject {
         return (errorMessage != nil || isStale ? "上次成功：" : "") + (minutes < 1 ? "刚刚更新" : "\(minutes) 分钟前更新")
     }
 
+    var retryText: String? {
+        guard monitoringAllowed, errorMessage != nil else { return nil }
+        if loading { return "正在重新查询…" }
+        let seconds = max(0, Int(ceil(nextRefresh.timeIntervalSince(now))))
+        if seconds <= 0 { return "即将自动重试，也可点右上角刷新" }
+        return seconds < 60 ? "约 \(seconds) 秒后自动重试" : "约 \(Int(ceil(Double(seconds) / 60))) 分钟后自动重试"
+    }
+
+    func quotaDetail(for period: QuotaPeriod) -> String {
+        if loading && bucket == nil { return "正在查询…" }
+        if errorMessage != nil { return "暂未取得有效额度，不代表额度已用完" }
+        if let window = bucket?.window(for: period) { return resetDescription(window, now: now) }
+        return lastUpdated == nil ? "等待查询额度" : "当前未返回此周期额度"
+    }
+
     func start() {
         guard !demo, monitoringAllowed, timer == nil else { return }
         refresh()
@@ -113,9 +128,11 @@ final class QuotaModel: ObservableObject {
         refresh()
     }
 
-    private func scheduleFailure() {
-        failures = min(failures + 1, 4)
-        nextRefresh = clock().addingTimeInterval(min(1800, 300 * pow(2, Double(failures - 1))))
+    private func scheduleFailure(_ error: QuotaError) {
+        failures = min(failures + 1, 5)
+        // Recover promptly from transient failures; avoid frequent auth/permission retries.
+        let delay = max(error.retryFloor, min(300, 30 * pow(2, Double(failures - 1))))
+        nextRefresh = clock().addingTimeInterval(delay)
     }
 
     func choose(_ period: QuotaPeriod) {
@@ -148,7 +165,7 @@ final class QuotaModel: ObservableObject {
         nextRefresh = now.addingTimeInterval(300)
         let executable = resolveExecutable.map { $0() } ?? Self.locateCodex()
         guard let executable else {
-            bucket = nil; errorMessage = QuotaError.missingCodex.message; scheduleFailure(); return
+            bucket = nil; errorMessage = QuotaError.missingCodex.message; scheduleFailure(.missingCodex); return
         }
         loading = true
         let request = CodexClient()
@@ -173,9 +190,10 @@ final class QuotaModel: ObservableObject {
                         self.choose(bucket.initialPeriod)
                     }
                 case .failure(let error):
-                    self.scheduleFailure()
+                    let classified = error as? QuotaError ?? .queryFailed
+                    self.scheduleFailure(classified)
                     self.bucket = nil
-                    self.errorMessage = (error as? QuotaError ?? .queryFailed).message
+                    self.errorMessage = classified.message
                 }
             }
         }

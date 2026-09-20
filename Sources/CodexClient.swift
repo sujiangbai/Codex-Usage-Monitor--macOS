@@ -83,11 +83,8 @@ final class CodexClient: @unchecked Sendable {
                 // Ignore all unsolicited events and requests; never execute server-supplied actions.
                 guard object["method"] == nil, let id = object["id"] as? Int, id == 1 || id == 2 else { continue }
                 if let failure = object["error"] as? [String: Any] {
-                    let message = (failure["message"] as? String ?? "").lowercased()
-                    if ["401", "unauthorized", "not logged", "authentication"].contains(where: message.contains) {
-                        throw QuotaError.authentication
-                    }
-                    throw QuotaError.queryFailed
+                    throw QuotaError.fromServer(code: failure["code"] as? Int,
+                                                message: failure["message"] as? String ?? "")
                 }
                 guard let result = object["result"] else { throw QuotaError.invalidResponse }
                 if id == 1 && !didInitialize {

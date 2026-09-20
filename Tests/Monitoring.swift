@@ -83,7 +83,8 @@ struct MonitoringTests {
         reopened.allowMonitoring()
         await waitFor { !reopened.loading }
         check(fixture.count == 4 && reopened.errorMessage != nil, "query failure is visible")
-        for (index, delay) in [300.0, 600, 1200, 1800, 1800].enumerated() {
+        check(reopened.quotaDetail(for: .weekly).contains("不代表额度已用完") && reopened.retryText != nil, "query failure is distinct from an absent quota window and includes retry status")
+        for (index, delay) in [30.0, 60, 120, 240, 300, 300].enumerated() {
             let previous = fixture.count
             time = time.addingTimeInterval(delay - 1)
             reopened.refreshAutomatically()
@@ -94,9 +95,11 @@ struct MonitoringTests {
             check(fixture.count == previous + 1, "automatic retry at backoff boundary \(index)")
         }
         fixture.fail(false)
-        time = time.addingTimeInterval(11)
-        reopened.refresh()
+        time = time.addingTimeInterval(300)
+        reopened.refreshAutomatically()
         await waitFor { !reopened.loading }
+        check(reopened.displayRemaining == 70 && reopened.retryText == nil, "automatic retry restores valid quota without manual action")
+        check(reopened.quotaDetail(for: .fiveHour) == "当前未返回此周期额度", "successful query with absent window stays distinct from transport failure")
         let recoveredCount = fixture.count
         time = time.addingTimeInterval(300)
         reopened.refreshAutomatically()

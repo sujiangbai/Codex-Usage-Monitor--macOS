@@ -202,7 +202,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let screen = statusItem.button?.window?.screen else { fatalError("No status bar screen") }
         let sample = model.bucket
         var top: CGFloat?
-        for phase in 0..<6 {
+        for phase in 0..<7 {
+            if phase == 6 {
+                model.allowMonitoring()
+                model.errorMessage = QuotaError.serviceUnavailable.message
+            }
             if phase == 5 { model.withdrawMonitoring() }
             model.bucket = phase == 0 ? nil : sample
             model.startupChosen = phase == 2
@@ -230,9 +234,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func renderPreview(to directory: URL) {
         // Render our own native view using synthetic values; never capture the user's screen.
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for (name, period, welcome) in [("weekly", QuotaPeriod.weekly, false), ("five-hour", .fiveHour, false), ("first-launch", .weekly, true), ("privacy", .weekly, true)] {
+        for (name, period, welcome) in [("weekly", QuotaPeriod.weekly, false), ("five-hour", .fiveHour, false), ("first-launch", .weekly, true), ("privacy", .weekly, true), ("query-error", .weekly, false)] {
             let sample = QuotaModel(demo: true, samplePeriod: period, welcome: welcome)
             if name == "privacy" { sample.withdrawMonitoring() }
+            if name == "query-error" { sample.bucket = nil; sample.errorMessage = QuotaError.serviceUnavailable.message }
             let view = NSHostingView(rootView: QuotaPanel(model: sample))
             view.appearance = NSAppearance(named: .aqua)
             view.setFrameSize(view.fittingSize)

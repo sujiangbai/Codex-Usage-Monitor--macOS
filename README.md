@@ -8,7 +8,7 @@
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.1-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
+从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.2-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
 
 发布包使用 ad-hoc 签名，**尚未经过 Apple Developer ID 签名及公证**，macOS 可能阻止打开下载的应用。也可以按照下方说明在自己的 Mac 上从源码构建。请勿为此关闭系统整体安全保护。
 
@@ -39,7 +39,7 @@ shasum -a 256 -c SHA256SUMS.txt
 ## 额度与刷新
 
 - 同意开始监控后查询，正常情况下每 5 分钟刷新；支持手动刷新，Mac 唤醒后若已到刷新时间会查询。
-- 连续失败的自动重试间隔为 5、10、20、30 分钟，之后上限 30 分钟；成功后恢复 5 分钟。手动刷新最短间隔 10 秒，进行中的查询不会重复启动。
+- 暂时性查询错误按 30、60、120、240、300 秒退避，上限 5 分钟；认证、权限、限流及接口兼容等错误至少等待 5 分钟。成功后恢复正常 5 分钟刷新。手动刷新最短间隔 10 秒，进行中的查询不会重复启动。
 - 默认优先每周；首次数据返回时 Plus 若有 5 小时额度则默认选中 5 小时。之后以用户的已保存选择为准。
 - 按接口 `windowDurationMins` 识别周期，不将 primary / secondary 固定解释成 5 小时 / 每周。
 - 优先使用 `rateLimitsByLimitId.codex`；不会把其他模型额度当成 Codex 主额度。

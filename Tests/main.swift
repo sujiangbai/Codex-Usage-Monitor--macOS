@@ -34,6 +34,26 @@ check(past.hasElapsed(at: Date(timeIntervalSince1970: 101)), "expired reset rema
 check(resetDescription(past, now: Date(timeIntervalSince1970: 101)).contains("等待刷新确认"), "do not invent quota recovery at reset time")
 check(resetDescription(QuotaWindow(usedPercent: 5, windowDurationMins: 300, resetsAt: nil), now: Date()) == "重置时间暂不可用", "null reset time")
 
+let newPlan = try decode(#"{"rateLimitsByLimitId":{"codex":{"planType":"prolite","primary":{"usedPercent":13,"windowDurationMins":10080,"resetsAt":2000000000}},"other":{"primary":{"usedPercent":0,"windowDurationMins":300}}}}"#)
+check(newPlan.codex?.window(for: .weekly)?.remaining == 87 && newPlan.codex?.window(for: .fiveHour) == nil, "unfamiliar plan type keeps weekly quota and never substitutes another bucket")
+for (code, message, expected) in [
+    (-32000, "request failed: HTTP 401 unauthorized TOKEN_SECRET", QuotaError.authentication),
+    (-32000, "failed to refresh token TOKEN_SECRET", .authentication),
+    (-32000, "error sending request for url (https://example.invalid/private) TOKEN_SECRET", .network),
+    (-32000, "TLS certificate rejected TOKEN_SECRET", .network),
+    (-32000, "HTTP 503 Service Unavailable TOKEN_SECRET", .serviceUnavailable),
+    (429, "too many requests TOKEN_SECRET", .rateLimited),
+    (-32000, "HTTP 403 Forbidden TOKEN_SECRET", .accessDenied),
+    (-32602, "Invalid params TOKEN_SECRET", .incompatibleProtocol),
+    (-32000, "unknown variant `future_plan` TOKEN_SECRET", .invalidResponse),
+    (-32000, "request timed out TOKEN_SECRET", .timeout),
+    (-32000, "unrecognized failure TOKEN_SECRET", .queryFailed)
+] {
+    let result = QuotaError.fromServer(code: code, message: message)
+    check(result == expected && !result.message.contains("TOKEN_SECRET") && !result.message.contains("example.invalid"), "classified RPC error: \(expected), no raw data exposure")
+}
+check(QuotaError.authentication.retryFloor == 300 && QuotaError.rateLimited.retryFloor == 300, "authentication and server throttling do not trigger rapid retry")
+
 signal(SIGPIPE, SIG_IGN)
 if CommandLine.arguments.contains("--live") {
     let result = try CodexClient().fetch(executable: URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"))
@@ -48,6 +68,9 @@ if let index = CommandLine.arguments.firstIndex(of: "--fake"), CommandLine.argum
     setenv("QUOTA_FAKE_MODE", "error", 1)
     do { _ = try CodexClient().fetch(executable: fake, timeout: 3); fatalError("Expected error") }
     catch let error as QuotaError { check(error.message.contains("登录状态不可用") && !error.message.contains("SECRET"), "server errors are classified without exposing raw text") }
+    setenv("QUOTA_FAKE_MODE", "service-error", 1)
+    do { _ = try CodexClient().fetch(executable: fake, timeout: 3); fatalError("Expected error") }
+    catch let error as QuotaError { check(error == .serviceUnavailable, "transport routes service failure to specific error category") }
     setenv("QUOTA_FAKE_MODE", "timeout", 1)
     let start = Date()
     do { _ = try CodexClient().fetch(executable: fake, timeout: 0.4); fatalError("Expected timeout") }

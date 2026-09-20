@@ -59,8 +59,34 @@ struct QuotaResponse: Decodable {
     }
 }
 
-enum QuotaError: Error {
+enum QuotaError: Error, Equatable {
     case missingCodex, launchFailed, timeout, disconnected, invalidResponse, authentication, queryFailed, cancelled
+    case network, serviceUnavailable, rateLimited, accessDenied, incompatibleProtocol
+
+    // Map to fixed local text only. Never expose the server's raw error or credentials.
+    static func fromServer(code: Int?, message: String) -> QuotaError {
+        let text = message.lowercased()
+        func contains(_ values: [String]) -> Bool { values.contains(where: text.contains) }
+        func status(_ value: Int) -> Bool {
+            code == value || text.range(of: "\\b\(value)\\b", options: .regularExpression) != nil
+        }
+        if code == -32601 || code == -32602 { return .incompatibleProtocol }
+        if status(401) || contains(["unauthorized", "not logged", "not authenticated", "authentication required", "failed to refresh token", "refresh token has expired", "refresh token has already been used"]) { return .authentication }
+        if status(429) || contains(["too many requests", "rate limit exceeded"]) { return .rateLimited }
+        if status(403) || contains(["forbidden", "access denied"]) { return .accessDenied }
+        if [500, 502, 503, 504].contains(where: status) { return .serviceUnavailable }
+        if contains(["timed out", "timeout"]) { return .timeout }
+        if contains(["error sending request", "failed to send request", "connection refused", "connection reset", "network is unreachable", "dns", "tls", "certificate", "proxy"]) { return .network }
+        if contains(["unknown variant", "missing field", "error decoding response", "failed to deserialize"]) { return .invalidResponse }
+        return .queryFailed
+    }
+
+    var retryFloor: TimeInterval {
+        switch self {
+        case .authentication, .rateLimited, .accessDenied, .incompatibleProtocol, .missingCodex, .invalidResponse: return 300
+        default: return 30
+        }
+    }
     var message: String {
         switch self {
         case .missingCodex: return "未找到 Codex。请先安装并登录 Codex，再点刷新。"
@@ -68,7 +94,12 @@ enum QuotaError: Error {
         case .timeout: return "查询超时，请检查网络后刷新。"
         case .launchFailed, .disconnected: return "无法启动额度查询。请确认 Codex 能正常打开后重试。"
         case .invalidResponse: return "暂时无法识别额度数据，请更新 Codex 后重试。"
-        case .queryFailed: return "额度查询失败，请检查网络或 Codex 登录状态后重试。"
+        case .network: return "额度查询连接失败，请检查网络或代理；将自动重试。"
+        case .serviceUnavailable: return "额度服务暂时不可用，将自动重试。"
+        case .rateLimited: return "额度接口请求受限，稍后自动重试。"
+        case .accessDenied: return "额度接口拒绝访问，请确认账号权限或网络访问限制。"
+        case .incompatibleProtocol: return "当前 Codex 额度接口不兼容，请更新 Codex 或本组件。"
+        case .queryFailed: return "额度接口返回错误，原因暂无法确定；将自动重试。"
         case .cancelled: return "查询已取消。"
         }
     }

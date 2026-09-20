@@ -21,6 +21,8 @@ assert request['params']['excludeResetCreditDetails'] is True
 print(json.dumps({'method': 'warning', 'params': {'message': 'ignore synthetic event'}}), flush=True)
 if mode == 'error':
     print(json.dumps({'id': 2, 'error': {'code': -1, 'message': '401 unauthorized SECRET'}}), flush=True)
+elif mode == 'service-error':
+    print(json.dumps({'id': 2, 'error': {'code': -32000, 'message': 'HTTP 503 Service Unavailable SECRET'}}), flush=True)
 else:
     reply = json.dumps({'id': 2, 'result': {'rateLimits': {'primary': {'usedPercent': 36, 'windowDurationMins': 10080}}}})
     sys.stdout.write(reply[:30])

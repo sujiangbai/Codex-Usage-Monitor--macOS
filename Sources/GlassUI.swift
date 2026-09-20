@@ -217,6 +217,10 @@ struct QuotaPanel: View {
                     Label(error, systemImage: "exclamationmark.circle")
                         .font(.system(size: 12)).foregroundStyle(GlassPalette.secondary)
                         .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
+                    if let retry = model.retryText {
+                        Text(retry).font(.system(size: 11)).foregroundStyle(GlassPalette.secondary)
+                            .fixedSize(horizontal: false, vertical: true).padding(.top, 4)
+                    }
                 } else if model.isStale && !model.loading && model.bucket != nil {
                     Text("数据已过期，请刷新后查看。").font(.system(size: 12))
                         .foregroundStyle(GlassPalette.secondary).padding(.top, 12)
@@ -330,7 +334,7 @@ struct QuotaPanel: View {
                 }
             }.frame(height: prominent ? 5 : 4).padding(.top, 7)
                 .accessibilityLabel("\(period.title)剩余").accessibilityValue(remaining.map { "\($0)%" } ?? "暂不可用")
-            Text(window.map { resetDescription($0, now: model.now) } ?? (model.loading ? "正在查询…" : "当前未返回此周期额度"))
+            Text(model.quotaDetail(for: period))
                 .font(.system(size: 11)).foregroundStyle(GlassPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true).padding(.top, 6)
         }
