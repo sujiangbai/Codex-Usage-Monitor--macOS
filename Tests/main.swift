@@ -55,11 +55,6 @@ for (code, message, expected) in [
 check(QuotaError.authentication.retryFloor == 300 && QuotaError.rateLimited.retryFloor == 300, "authentication and server throttling do not trigger rapid retry")
 
 signal(SIGPIPE, SIG_IGN)
-if CommandLine.arguments.contains("--live") {
-    let result = try CodexClient().fetch(executable: URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"))
-    check(result.codex != nil, "native client live quota query")
-    check(result.codex?.window(for: .weekly)?.remaining != nil || result.codex?.window(for: .fiveHour)?.remaining != nil, "native client receives supported window")
-}
 if let index = CommandLine.arguments.firstIndex(of: "--fake"), CommandLine.arguments.indices.contains(index + 1) {
     let fake = URL(fileURLWithPath: CommandLine.arguments[index + 1])
     setenv("QUOTA_FAKE_MODE", "success", 1)

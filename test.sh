@@ -11,4 +11,4 @@ build/placement-tests
 xcrun swiftc -swift-version 5 -module-cache-path "$PWD/build/module-cache" \
   Sources/Quota.swift Sources/CodexClient.swift Sources/QuotaModel.swift Tests/Monitoring.swift \
   -o build/monitoring-tests -framework AppKit -framework ServiceManagement
-build/monitoring-tests
+build/monitoring-tests "$@"

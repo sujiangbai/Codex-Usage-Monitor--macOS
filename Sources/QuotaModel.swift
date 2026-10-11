@@ -18,6 +18,7 @@ final class QuotaModel: ObservableObject {
     let demo: Bool
     private var hasSelected: Bool
     private var timer: Timer?
+    private var refreshTimer: Timer?
     private var client: CodexClient?
     private var nextRefresh = Date.distantPast
     private var nextManualRefresh = Date.distantPast
@@ -99,6 +100,7 @@ final class QuotaModel: ObservableObject {
     func stop() {
         generation += 1
         timer?.invalidate(); timer = nil
+        refreshTimer?.invalidate(); refreshTimer = nil
         client?.cancel(); client = nil
         loading = false
     }
@@ -128,29 +130,56 @@ final class QuotaModel: ObservableObject {
         refresh()
     }
 
+    private func scheduleRefresh(at date: Date) {
+        nextRefresh = date
+        refreshTimer?.invalidate()
+        guard !demo, monitoringAllowed else { return }
+        let timer = Timer(timeInterval: max(0.1, date.timeIntervalSince(clock())), repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.refreshAutomatically() }
+        }
+        refreshTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func scheduleSuccess() {
+        var deadline = max((lastUpdated ?? clock()).addingTimeInterval(300), nextManualRefresh)
+        if let reset = selectedWindow?.resetDate {
+            deadline = min(deadline, max(reset, nextManualRefresh))
+        }
+        scheduleRefresh(at: deadline)
+    }
+
     private func scheduleFailure(_ error: QuotaError) {
-        failures = min(failures + 1, 5)
+        failures = min(failures + 1, 6)
         // Recover promptly from transient failures; avoid frequent auth/permission retries.
-        let delay = max(error.retryFloor, min(300, 30 * pow(2, Double(failures - 1))))
-        nextRefresh = clock().addingTimeInterval(delay)
+        let base: Double = error == .incompleteQuota ? 10 : 30
+        let delay = max(error.retryFloor, min(300, base * pow(2, Double(failures - 1))))
+        scheduleRefresh(at: clock().addingTimeInterval(delay))
     }
 
     func choose(_ period: QuotaPeriod) {
         selected = period
         hasSelected = true
         if !demo { preferences.set(period.rawValue, forKey: "displayPeriod") }
+        if lastUpdated != nil, errorMessage == nil, !loading { scheduleSuccess() }
     }
 
     static func locateCodex() -> URL? {
-        // Resolve only the official application and standard CLI locations.
-        var candidates: [URL] = []
+        var applications: [URL] = []
         if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
-            candidates.append(app.appendingPathComponent("Contents/Resources/codex"))
+            applications.append(app)
         }
-        candidates += ["/Applications/ChatGPT.app/Contents/Resources/codex",
-                       "/Applications/Codex.app/Contents/Resources/codex",
-                       "/opt/homebrew/bin/codex", "/usr/local/bin/codex"].map { URL(fileURLWithPath: $0) }
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        applications += ["/Applications/ChatGPT.app", "/Applications/Codex.app"].map { URL(fileURLWithPath: $0) }
+        return locateCodex(in: applications,
+            cliCandidates: ["/opt/homebrew/bin/codex", "/usr/local/bin/codex"].map { URL(fileURLWithPath: $0) })
+    }
+
+    static func locateCodex(in applications: [URL], cliCandidates: [URL],
+                            isExecutable: (URL) -> Bool = { FileManager.default.isExecutableFile(atPath: $0.path) }) -> URL? {
+        // New packaged entrypoint prepares the CLI resources before exec; keep the legacy layout.
+        let layouts = ["Contents/Resources/codex-cli/bin/codex", "Contents/Resources/codex"]
+        let candidates = applications.flatMap { app in layouts.map { app.appendingPathComponent($0) } } + cliCandidates
+        return candidates.first(where: isExecutable)
     }
 
     func refresh() {
@@ -162,6 +191,7 @@ final class QuotaModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
             self?.objectWillChange.send()
         }
+        refreshTimer?.invalidate(); refreshTimer = nil
         nextRefresh = now.addingTimeInterval(300)
         let executable = resolveExecutable.map { $0() } ?? Self.locateCodex()
         guard let executable else {
@@ -181,14 +211,29 @@ final class QuotaModel: ObservableObject {
                 self.now = self.clock()
                 switch result {
                 case .success(let response):
+                    let candidate = response.codex
+                    let period = self.hasSelected ? self.selected : (candidate?.initialPeriod ?? self.selected)
+                    let windows = QuotaPeriod.allCases.compactMap { candidate?.window(for: $0) }
+                    let selectedWindow = candidate?.window(for: period)
+                    // A decoded RPC result is not necessarily a usable quota snapshot.
+                    // Do not stamp empty, missing-usage or pre-reset data as a successful update.
+                    let hasUsableWindow = windows.contains { $0.remaining != nil && !$0.hasElapsed(at: self.now) }
+                    let selectedInvalid = selectedWindow.map { $0.remaining == nil || $0.hasElapsed(at: self.now) } ?? false
+                    let selectedDisappeared = selectedWindow == nil && self.bucket?.window(for: period) != nil
+                    if !hasUsableWindow || selectedInvalid || selectedDisappeared {
+                        self.bucket = nil
+                        self.errorMessage = QuotaError.incompleteQuota.message
+                        self.scheduleFailure(.incompleteQuota)
+                        return
+                    }
                     self.failures = 0
-                    self.nextRefresh = self.now.addingTimeInterval(300)
-                    self.bucket = response.codex
+                    self.bucket = candidate
                     self.lastUpdated = self.now
                     self.errorMessage = nil
                     if !self.hasSelected, let bucket = response.codex {
                         self.choose(bucket.initialPeriod)
                     }
+                    self.scheduleSuccess()
                 case .failure(let error):
                     let classified = error as? QuotaError ?? .queryFailed
                     self.scheduleFailure(classified)

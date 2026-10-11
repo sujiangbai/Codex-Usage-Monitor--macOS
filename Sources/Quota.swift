@@ -61,7 +61,7 @@ struct QuotaResponse: Decodable {
 
 enum QuotaError: Error, Equatable {
     case missingCodex, launchFailed, timeout, disconnected, invalidResponse, authentication, queryFailed, cancelled
-    case network, serviceUnavailable, rateLimited, accessDenied, incompatibleProtocol
+    case network, serviceUnavailable, rateLimited, accessDenied, incompatibleProtocol, incompleteQuota
 
     // Map to fixed local text only. Never expose the server's raw error or credentials.
     static func fromServer(code: Int?, message: String) -> QuotaError {
@@ -84,6 +84,7 @@ enum QuotaError: Error, Equatable {
     var retryFloor: TimeInterval {
         switch self {
         case .authentication, .rateLimited, .accessDenied, .incompatibleProtocol, .missingCodex, .invalidResponse: return 300
+        case .incompleteQuota: return 10
         default: return 30
         }
     }
@@ -101,6 +102,7 @@ enum QuotaError: Error, Equatable {
         case .incompatibleProtocol: return "当前 Codex 额度接口不兼容，请更新 Codex 或本组件。"
         case .queryFailed: return "额度接口返回错误，原因暂无法确定；将自动重试。"
         case .cancelled: return "查询已取消。"
+        case .incompleteQuota: return "额度数据暂未就绪或尚未完成重置，将自动重试。"
         }
     }
 }
