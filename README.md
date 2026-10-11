@@ -8,7 +8,7 @@
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.2-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
+从 [GitHub Releases](https://github.com/sujiangbai/Codex-Usage-Monitor--macOS/releases) 下载 `Codex-Usage-Monitor-v0.1.4-macOS-arm64.zip`，解压后将应用放入 `~/Applications`（推荐）或 `/Applications`，再打开。更新前先退出旧版。当前支持 Apple Silicon Mac 和 macOS 13+，不提供 Intel 构建。
 
 发布包使用 ad-hoc 签名，**尚未经过 Apple Developer ID 签名及公证**，macOS 可能阻止打开下载的应用。也可以按照下方说明在自己的 Mac 上从源码构建。请勿为此关闭系统整体安全保护。
 
@@ -36,7 +36,7 @@ shasum -a 256 -c SHA256SUMS.txt
 
 右上角圆箭头用于刷新。常规状态将启动开关和退出放在同一行；首次启动使用独立引导区。菜单栏显示选择、双周期数据展示、低额度颜色提示、错误与登录项审批提示均保留。Tab 可移动焦点，空格或回车可激活当前按钮。
 
-当前源码版本为 **v0.1.4**，包含额度查询与重置刷新修复；Releases 中的安装包仍为 **v0.1.2**，尚未包含这些修复。需要最新修复可按下方步骤从源码构建。
+当前版本为 **v0.1.4**，包含新版 Codex 路径兼容、额度查询与重置刷新修复。
 
 ## 额度与刷新
 
